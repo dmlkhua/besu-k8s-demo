@@ -1,0 +1,149 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: node1
+spec:
+  storageClassName: gp2-general
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: node1keys
+data:
+  key: ODExYTM1MTM4YzQxMmNlYzVjNzQxZjViYzJkYzk3N2ExZWZmMDBmZjNhZmI3Y2Q0Y2ExYWMxMzU4YjZjNTE0MQ==
+  key.pub: ZTAxNmE3OGViYWY5ZGRmNjk0ZThlYzYxOGY0NjljZGVlMzVkNTNiNzM2ZjFmYTk3M2IxNTAwOTNjZmZjN2VjN2Q5MmZkZDkzYTRjMTczN2MwMjhmOGJkNjdmNWEwY2EyOGE3NTE2NzE5MTI5OWUwODE1NmYzYjQzODU1NjE2YzE=
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: node1cfg
+data:
+  config.toml: |
+    data-path="/etc/data"
+    discovery-enabled=true
+    genesis-file="/etc/config/genesis/genesis.json"
+    host-allowlist=["*"]
+    logging="DEBUG"
+    max-peers=25
+    node-private-key-file="/etc/keys/key"
+    p2p-enabled=true
+    p2p-host="0.0.0.0"
+    p2p-port=30303
+    revert-reason-enabled=true
+    rpc-http-api=["DEBUG", "ETH", "WEB3", "NET", "TRACE", "QBFT", "TXPOOL", "ADMIN", "PERM", "EEA"]
+    rpc-http-authentication-enabled=false
+    rpc-http-cors-origins=["all"]
+    rpc-http-enabled=true
+    rpc-http-host="0.0.0.0"
+    rpc-http-max-active-connections=80
+    rpc-http-port=8545
+    rpc-ws-api=["DEBUG", "ETH", "WEB3", "NET", "TRACE", "QBFT", "TXPOOL", "ADMIN", "PERM", "EEA"]
+    rpc-ws-authentication-enabled=false
+    rpc-ws-enabled=true
+    rpc-ws-host="0.0.0.0"
+    rpc-ws-max-active-connections=80
+    rpc-ws-port=8546
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node1
+spec:
+  selector:
+    matchLabels:
+      node: node1
+  template:
+    metadata:
+      labels:
+        node: node1
+    spec:
+      volumes:
+        - name: config
+          configMap:
+            name: node1cfg
+        - name: genesis
+          configMap:
+            name: genesis
+        - name: data
+          persistentVolumeClaim:
+            claimName: node1
+        - name: keys
+          secret:
+            secretName: node1keys
+      initContainers:
+        - name: fix-perms
+          image: busybox
+          volumeMounts:
+            - mountPath: /etc/data
+              name: data
+          resources:
+            limits:
+              cpu: 500m
+              memory: 500Mi
+          securityContext:
+            runAsUser: 0
+          command:
+            - sh
+            - -c
+            - chown -R 1000:1000 /etc/data
+      containers:
+        - name: main
+          image: hyperledger/besu:24.3.0
+          volumeMounts:
+            - mountPath: /etc/config/genesis
+              name: genesis
+            - mountPath: /etc/config/node
+              name: config
+            - mountPath: /etc/keys
+              name: keys
+            - mountPath: /etc/data
+              name: data
+          ports:
+            - containerPort: 30303
+              protocol: UDP
+            - containerPort: 8545
+              protocol: TCP
+            - containerPort: 8546
+              protocol: TCP
+          command:
+            - /bin/bash
+            - -c
+            - --
+          args:
+            - /opt/besu/bin/besu --Xdns-enabled=true --Xdns-update-enabled=true --Xnat-kube-service-name=node1 --config-file=/etc/config/node/config.toml --min-gas-price=0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: node1
+spec:
+  selector:
+    node: node1
+  ports:
+    - port: 30303
+      targetPort: 30303
+      name: p2p
+    - port: 8545
+      targetPort: 8545
+      name: rpc
+    - port: 8546
+      targetPort: 8546
+      name: rpcws
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRouteUDP
+metadata:
+  name: node1p2p
+spec:
+  routes:
+    - kind: Rule
+      match: Host(`node1dmlkh.{{DOMAIN}}`)
+      services:
+        - name: node1
+          port: 30303
