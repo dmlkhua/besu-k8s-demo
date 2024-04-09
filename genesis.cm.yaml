@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: genesis
+data:
+  genesis.json: |
+    {
+      "alloc" : { },
+      "coinbase" : "0x0000000000000000000000000000000000000000",
+      "config" : {
+        "chainId" : 1337,
+        "contractSizeLimit" : 2147483647,
+        "londonBlock" : 0,
+        "qbft" : {
+          "blockperiodseconds" : 3,
+          "epochlength" : 30000,
+          "requesttimeoutseconds" : 3
+        },
+        "zeroBaseFee" : true
+      },
+      "difficulty" : "0x1",
+      "gasLimit" : "0x1fffffffffffff",
+      "gasUsed" : "0x0",
+      "mixHash" : "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "nonce" : "0x0",
+      "parentHash" : "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "timestamp" : "0x58ee40ba",
+      "extraData" : "0xf87aa00000000000000000000000000000000000000000000000000000000000000000f85494265792e1b61fd096300e671a606f3d196eb3410094ef9926591e2f68af78caeb80f4f246a6a0e04452945bf83eaf6a1f9bbc14a47239f37bdc0b140f5dc99474a4c89181365b3551f2221daafba130ef669a22c080c0"
+    }    
